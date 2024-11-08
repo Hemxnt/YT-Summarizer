@@ -10,13 +10,17 @@ load_dotenv()
 # Configure Google GenAI
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Prompt template
-prompt = """You are a YouTube video summarizer. You will take the transcript text
+# Prompt templates
+summary_prompt = """You are a YouTube video summarizer. You will take the transcript text
 and summarize the entire video, providing important points in 250 words. Please summarize the text given here: """
 
-# Translation prompt
 translation_prompt = """You are a professional translator. Translate the given text to {language}.
 Provide a clear and accurate translation. Here is the text: """
+
+qa_prompt = """You are a helpful assistant. Answer the following question based on the YouTube video transcript:
+Transcript: {transcript}
+Question: {question}
+Answer: """
 
 # Function to extract transcript details
 def extract_transcript_details(youtube_video_url):
@@ -46,8 +50,16 @@ def translate_using_genai(text, language):
     )
     return translation_response.text
 
+# Function to handle Q&A using GenAI
+def generate_qa_response(transcript_text, question):
+    model = genai.GenerativeModel("gemini-pro")
+    qa_response = model.generate_content(
+        qa_prompt.format(transcript=transcript_text, question=question)
+    )
+    return qa_response.text
+
 # Streamlit app UI
-st.title("YouTube Video Summarizer")
+st.title("YouTube Video Summarizer and Q&A")
 
 youtube_link = st.text_input("Enter YouTube Video Link:")
 
@@ -57,14 +69,16 @@ if youtube_link:
 
 if st.button("Get Summary"):
     transcript_text = extract_transcript_details(youtube_link)
-    summary = generate_gemini_content(transcript_text, prompt)
+    summary = generate_gemini_content(transcript_text, summary_prompt)
     st.session_state["summary"] = summary  # Store summary in session state
+    st.session_state["transcript"] = transcript_text  # Store transcript for Q&A
     st.markdown("## Summary:")
     st.write(summary)
 
 if "summary" in st.session_state:
     summary = st.session_state["summary"]
-    
+
+    # Translation Section
     languages = {
         "Hindi": "Hindi",
         "Tamil": "Tamil",
@@ -78,10 +92,23 @@ if "summary" in st.session_state:
         "Spanish": "Spanish",
         "French": "French"
     }
-    
+
     selected_language = st.selectbox("Translate summary to:", options=list(languages.keys()))
 
     if st.button("Translate Summary"):
         translated_summary = translate_using_genai(summary, languages[selected_language])
         st.markdown(f"## Translated Summary in {selected_language}:")
         st.write(translated_summary)
+
+    # Q&A Section
+    st.markdown("## Ask a Question about the Video")
+    question = st.text_input("Enter your question:")
+    
+    if st.button("Get Answer"):
+        if question.strip():
+            transcript_text = st.session_state["transcript"]
+            answer = generate_qa_response(transcript_text, question)
+            st.markdown("### Answer:")
+            st.write(answer)
+        else:
+            st.error("Please enter a question.")
