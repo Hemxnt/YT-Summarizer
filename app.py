@@ -67,16 +67,24 @@ if youtube_link:
     video_id = youtube_link.split("=")[1]
     st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_container_width=True)
 
+# Initialize session state
+if "summary" not in st.session_state:
+    st.session_state["summary"] = None
+if "translated_summary" not in st.session_state:
+    st.session_state["translated_summary"] = None
+if "qa_answer" not in st.session_state:
+    st.session_state["qa_answer"] = None
+
 if st.button("Get Summary"):
     transcript_text = extract_transcript_details(youtube_link)
     summary = generate_gemini_content(transcript_text, summary_prompt)
     st.session_state["summary"] = summary  # Store summary in session state
     st.session_state["transcript"] = transcript_text  # Store transcript for Q&A
-    st.markdown("## Summary:")
-    st.write(summary)
 
-if "summary" in st.session_state:
-    summary = st.session_state["summary"]
+# Display the persistent summary
+if st.session_state["summary"]:
+    st.markdown("## Summary:")
+    st.write(st.session_state["summary"])
 
     # Translation Section
     languages = {
@@ -96,19 +104,27 @@ if "summary" in st.session_state:
     selected_language = st.selectbox("Translate summary to:", options=list(languages.keys()))
 
     if st.button("Translate Summary"):
-        translated_summary = translate_using_genai(summary, languages[selected_language])
-        st.markdown(f"## Translated Summary in {selected_language}:")
-        st.write(translated_summary)
+        translated_summary = translate_using_genai(st.session_state["summary"], languages[selected_language])
+        st.session_state["translated_summary"] = translated_summary
 
-    # Q&A Section
+# Display the persistent translated summary
+if st.session_state["translated_summary"]:
+    st.markdown("## Translated Summary:")
+    st.write(st.session_state["translated_summary"])
+
+# Q&A Section
+if st.session_state["summary"]:
     st.markdown("## Ask a Question about the Video")
     question = st.text_input("Enter your question:")
-    
+
     if st.button("Get Answer"):
         if question.strip():
-            transcript_text = st.session_state["transcript"]
-            answer = generate_qa_response(transcript_text, question)
-            st.markdown("### Answer:")
-            st.write(answer)
+            answer = generate_qa_response(st.session_state["transcript"], question)
+            st.session_state["qa_answer"] = answer
         else:
             st.error("Please enter a question.")
+
+# Display the persistent Q&A response
+if st.session_state["qa_answer"]:
+    st.markdown("### Answer:")
+    st.write(st.session_state["qa_answer"])
